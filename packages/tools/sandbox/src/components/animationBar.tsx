@@ -46,18 +46,50 @@ export class AnimationBar extends React.Component<IAnimationBarProps, { groupInd
     }
 
     getCurrentPosition() {
-        if (!this._currentGroup) {
-            return "0";
-        }
-        const targetedAnimations = this._currentGroup.targetedAnimations;
-        if (targetedAnimations.length > 0) {
-            const runtimeAnimations = this._currentGroup.targetedAnimations[0].animation.runtimeAnimations;
-            if (runtimeAnimations.length > 0) {
-                return runtimeAnimations[0].currentFrame.toString();
+        if (this._currentGroup) {
+            const targetedAnimations = this._currentGroup.targetedAnimations;
+            if (targetedAnimations.length > 0) {
+                const runtimeAnimations = this._currentGroup.targetedAnimations[0].animation.runtimeAnimations;
+                if (runtimeAnimations.length > 0) {
+                    return runtimeAnimations[0].currentFrame.toString();
+                }
             }
+        } else if (this._currentAnimatable) {
+            return this._currentAnimatable.masterFrame.toString();
         }
 
         return "0";
+    }
+
+    isPlaying() {
+        console.log("isPlaying:", this._currentGroup, this._currentAnimatable);
+        if (this._currentGroup) {
+            return this._currentGroup.isPlaying;
+        }
+        if (this._currentAnimatable) {
+            return !this._currentAnimatable.paused;
+        }
+        return false;
+    }
+
+    fromFrame() {
+        if (this._currentGroup) {
+            return this._currentGroup.from;
+        }
+        if (this._currentRange) {
+            return this._currentRange.from;
+        }
+        return 0;
+    }
+
+    toFrame() {
+        if (this._currentGroup) {
+            return this._currentGroup.to;
+        }
+        if (this._currentRange) {
+            return this._currentRange.to;
+        }
+        return 0;
     }
 
     registerBeforeRender(newScene: Scene) {
@@ -67,10 +99,10 @@ export class AnimationBar extends React.Component<IAnimationBarProps, { groupInd
 
         this._currentScene = newScene;
         this._sliderSyncObserver = this._currentScene.onBeforeRenderObservable.add(() => {
-            if (this._currentGroup && this._sliderRef.current) {
+            if (this._sliderRef.current) {
                 this._sliderRef.current.value = this.getCurrentPosition();
 
-                if (this._currentPlayingState !== this._currentGroup.isPlaying) {
+                if (this._currentPlayingState !== this.isPlaying()) {
                     this.forceUpdate();
                 }
             }
@@ -78,36 +110,30 @@ export class AnimationBar extends React.Component<IAnimationBarProps, { groupInd
     }
 
     pause() {
-        if (!this._currentGroup) {
-            return;
-        }
-
-        this._currentGroup.pause();
+        this._currentGroup?.pause();
+        this._currentAnimatable?.pause();
         this.forceUpdate();
     }
 
     play() {
-        if (!this._currentGroup) {
-            return;
-        }
-
-        this._currentGroup.play();
+        this._currentGroup?.play();
+        this._currentAnimatable?.restart();
         this.forceUpdate();
     }
 
     sliderInput(evt: React.FormEvent<HTMLInputElement>) {
-        if (!this._currentGroup) {
-            return;
-        }
-
         const value = parseFloat((evt.target as HTMLInputElement).value);
 
-        if (!this._currentGroup.isPlaying) {
-            this._currentGroup.play(true);
-            this._currentGroup.goToFrame(value);
-            this._currentGroup.pause();
-        } else {
-            this._currentGroup.goToFrame(value);
+        if (this._currentGroup) {
+            if (!this._currentGroup.isPlaying) {
+                this._currentGroup.play(true);
+                this._currentGroup.goToFrame(value);
+                this._currentGroup.pause();
+            } else {
+                this._currentGroup.goToFrame(value);
+            }
+        } else if (this._currentAnimatable) {
+            this._currentAnimatable.goToFrame(value);
         }
     }
 
@@ -158,16 +184,16 @@ export class AnimationBar extends React.Component<IAnimationBarProps, { groupInd
             <div className="animationBar">
                 <div className="row">
                     <button id="playBtn">
-                        {this._currentGroup?.isPlaying && <img id="pauseImg" src={iconPause} onClick={() => this.pause()} />}
-                        {!this._currentGroup?.isPlaying && <img id="playImg" src={iconPlay} onClick={() => this.play()} />}
+                        {this.isPlaying() && <img id="pauseImg" src={iconPause} onClick={() => this.pause()} />}
+                        {!this.isPlaying() && <img id="playImg" src={iconPlay} onClick={() => this.play()} />}
                     </button>
                     <input
                         ref={this._sliderRef}
                         className="slider"
                         type="range"
                         onInput={(evt) => this.sliderInput(evt)}
-                        min={this._currentGroup?.from}
-                        max={this._currentGroup?.to}
+                        min={this.fromFrame()}
+                        max={this.toFrame()}
                         onChange={() => {}}
                         value={this.getCurrentPosition()}
                         step="any"
