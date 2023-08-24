@@ -15,11 +15,17 @@ import { Color3, Color4 } from "core/Maths/math";
 import "./scss/main.scss";
 import fullScreenLogo from "./img/logo-fullscreen.svg";
 
+declare global {
+    var assetUrl: string;
+    var envUrl: string;
+}
+
 interface ISandboxProps {}
 
 export class Sandbox extends React.Component<ISandboxProps, { isFooterVisible: boolean; errorMessage: string }> {
     private _globalState: GlobalState;
     private _assetUrl?: string;
+    private _envUrl?: string;
     private _autoRotate?: boolean;
     private _cameraPosition?: Vector3;
     private _logoRef: React.RefObject<HTMLImageElement>;
@@ -34,9 +40,12 @@ export class Sandbox extends React.Component<ISandboxProps, { isFooterVisible: b
         this._logoRef = React.createRef();
         this._dropTextRef = React.createRef();
         this._clickInterceptorRef = React.createRef();
+        this._assetUrl = globalThis.assetUrl;
+        this._envUrl = globalThis.envUrl;
 
         this.state = { isFooterVisible: true, errorMessage: "" };
 
+        EnvironmentTools.SkyboxPath = "assets/environmentSpecular.env";
         this.checkUrl();
 
         EnvironmentTools.HookWithEnvironmentChange(this._globalState);
@@ -206,6 +215,7 @@ export class Sandbox extends React.Component<ISandboxProps, { isFooterVisible: b
                         <RenderingZone
                             globalState={this._globalState}
                             assetUrl={this._assetUrl}
+                            envUrl={this._envUrl}
                             autoRotate={this._autoRotate}
                             cameraPosition={this._cameraPosition}
                             expanded={!this.state.isFooterVisible}

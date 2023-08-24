@@ -21,6 +21,7 @@ import "../scss/renderingZone.scss";
 import { PBRBaseMaterial } from "core/Materials/PBR/pbrBaseMaterial";
 import { Texture } from "core/Materials/Textures/texture";
 import { PBRMaterial } from "core/Materials/PBR/pbrMaterial";
+import { HDRCubeTexture } from "core/Materials/Textures/hdrCubeTexture";
 
 function isTextureAsset(name: string): boolean {
     const queryStringIndex = name.indexOf("?");
@@ -34,6 +35,7 @@ function isTextureAsset(name: string): boolean {
 interface IRenderingZoneProps {
     globalState: GlobalState;
     assetUrl?: string;
+    envUrl?: string;
     autoRotate?: boolean;
     cameraPosition?: Vector3;
     expanded: boolean;
@@ -259,11 +261,19 @@ export class RenderingZone extends React.Component<IRenderingZoneProps> {
         }
     }
 
+    prepareEnv() {
+        if (this.props.envUrl) {
+            const reflectionTexture = new HDRCubeTexture(this.props.envUrl, this._scene, 128, false, true, false, true);
+            this._scene.environmentTexture = reflectionTexture;
+        }
+    }
+
     onSceneLoaded(filename: string) {
         this._scene.skipFrustumClipping = true;
 
         this.props.globalState.onSceneLoaded.notifyObservers({ scene: this._scene, filename: filename });
 
+        this.prepareEnv();
         this.prepareCamera();
         this.prepareLighting();
         this.handleErrors();

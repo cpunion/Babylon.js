@@ -62,7 +62,6 @@ export class AnimationBar extends React.Component<IAnimationBarProps, { groupInd
     }
 
     isPlaying() {
-        console.log("isPlaying:", this._currentGroup, this._currentAnimatable);
         if (this._currentGroup) {
             return this._currentGroup.isPlaying;
         }
