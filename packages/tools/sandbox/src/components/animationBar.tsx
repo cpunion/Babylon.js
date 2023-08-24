@@ -5,6 +5,9 @@ import type { Scene } from "core/scene";
 import type { Observer } from "core/Misc/observable";
 import type { Nullable } from "core/types";
 import type { AnimationGroup } from "core/Animations/animationGroup";
+import { AnimationRange } from "core/Animations/animationRange";
+import type { Animatable } from "core/Animations/animatable";
+import { Skeleton } from "core/Bones/skeleton";
 
 import iconPlay from "../img/icon-play.svg";
 import iconPause from "../img/icon-pause.svg";
@@ -20,6 +23,9 @@ export class AnimationBar extends React.Component<IAnimationBarProps, { groupInd
     private _currentScene: Scene;
     private _sliderSyncObserver: Nullable<Observer<Scene>>;
     private _currentGroup: Nullable<AnimationGroup>;
+    private _currentSkeleton: Nullable<Skeleton>;
+    private _currentRange: Nullable<AnimationRange>;
+    private _currentAnimatable: Nullable<Animatable>;
     private _sliderRef: React.RefObject<HTMLInputElement>;
     private _currentPlayingState: boolean;
 
@@ -105,6 +111,19 @@ export class AnimationBar extends React.Component<IAnimationBarProps, { groupInd
         }
     }
 
+    getAnimationRange(scene: Scene, index: number) {
+        for (let i = 0; i < scene.skeletons.length; i++) {
+            const skeleton = scene.skeletons[i];
+            const ranges = skeleton.getAnimationRanges();
+            if (index < ranges.length) {
+                const range = ranges[index];
+                return { skeleton, range };
+            }
+            index -= ranges.length;
+        }
+        return {};
+    }
+
     public render() {
         if (!this.props.enabled) {
             this._currentGroup = null;
@@ -112,30 +131,43 @@ export class AnimationBar extends React.Component<IAnimationBarProps, { groupInd
         }
         const scene = this.props.globalState.currentScene;
 
-        if (scene.animationGroups.length === 0) {
-            this._currentGroup = null;
-            return null;
-        }
-
         const groupNames = scene.animationGroups.map((g) => g.name);
+        const rangeNames = scene.skeletons.map((s) => s.getAnimationRanges().map((r) => `${s.name} / ${r?.name}`)).flat();
 
-        this._currentGroup = scene.animationGroups[this.state.groupIndex];
-        this._currentPlayingState = this._currentGroup.isPlaying;
+        if (!this._currentGroup || !scene.animationGroups.includes(this._currentGroup)) {
+            this._currentGroup = scene.animationGroups[this.state.groupIndex] || null;
+            if (this._currentGroup) {
+                this._currentGroup.play(true);
+                this._currentPlayingState = this._currentGroup.isPlaying;
+            }
+        }
+        if (this.state.groupIndex >= scene.animationGroups.length) {
+            const { skeleton, range } = this.getAnimationRange(scene, this.state.groupIndex - scene.animationGroups.length);
+            if (this._currentSkeleton !== skeleton || this._currentRange !== range) {
+                this._currentGroup?.stop();
+                if (skeleton && range) {
+                    this._currentSkeleton = skeleton!;
+                    this._currentRange = range!;
+                    this._currentAnimatable = skeleton?.beginAnimation(range?.name!, true)!;
+                    this._currentPlayingState = !!this._currentAnimatable;
+                }
+            }
+        }
 
         return (
             <div className="animationBar">
                 <div className="row">
                     <button id="playBtn">
-                        {this._currentGroup.isPlaying && <img id="pauseImg" src={iconPause} onClick={() => this.pause()} />}
-                        {!this._currentGroup.isPlaying && <img id="playImg" src={iconPlay} onClick={() => this.play()} />}
+                        {this._currentGroup?.isPlaying && <img id="pauseImg" src={iconPause} onClick={() => this.pause()} />}
+                        {!this._currentGroup?.isPlaying && <img id="playImg" src={iconPlay} onClick={() => this.play()} />}
                     </button>
                     <input
                         ref={this._sliderRef}
                         className="slider"
                         type="range"
                         onInput={(evt) => this.sliderInput(evt)}
-                        min={this._currentGroup.from}
-                        max={this._currentGroup.to}
+                        min={this._currentGroup?.from}
+                        max={this._currentGroup?.to}
                         onChange={() => {}}
                         value={this.getCurrentPosition()}
                         step="any"
@@ -144,15 +176,27 @@ export class AnimationBar extends React.Component<IAnimationBarProps, { groupInd
                 <DropUpButton
                     globalState={this.props.globalState}
                     label="Active animation group"
-                    options={groupNames}
+                    options={[...groupNames, ...rangeNames]}
                     activeEntry={() => ""}
-                    selectedOption={this._currentGroup.name}
+                    selectedOption={this._currentGroup?.name || rangeNames?.[0]}
                     onOptionPicked={(option, index) => {
-                        this._currentGroup!.stop();
+                        this._currentGroup?.stop();
+                        this._currentAnimatable?.stop();
+                        this._currentGroup = null;
+                        this._currentAnimatable = null;
 
                         this.setState({ groupIndex: index });
 
-                        scene.animationGroups[index].play(true);
+                        if (index >= scene.animationGroups.length) {
+                            const { skeleton, range } = this.getAnimationRange(scene, index - scene.animationGroups.length);
+                            if (skeleton && range) {
+                                this._currentSkeleton = skeleton;
+                                this._currentRange = range;
+                                this._currentAnimatable = skeleton?.beginAnimation(range?.name!, true)!;
+                            }
+                        } else {
+                            this._currentGroup = scene.animationGroups[index].play(true);
+                        }
                     }}
                     enabled={true}
                     searchPlaceholder="Search animation"

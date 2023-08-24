@@ -45,8 +45,8 @@
         cursor: pointer;
 
         &.long {
-            width: 200px;
-            grid-template-columns: var(--footer-height) calc(200px - var(--footer-height));
+            width: 300px;
+            grid-template-columns: var(--footer-height) calc(300px - var(--footer-height));
 
             .button-icon {
                 grid-row: 1;
@@ -133,7 +133,7 @@
             }
 
             &.long-mode {
-                width: 200px;
+                width: 300px;
             }
 
             .dropup-content-line {
